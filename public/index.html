@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Chat & File Transfer</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js" defer></script>
+    <style>
+        /* CSS remains largely the same but could be organized better */
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --bg-tertiary: #252525;
+            --text-primary: #e0e0e0;
+            --text-secondary: #888;
+            --accent: #4a8cff;
+            --border: #333;
+            --success: #4caf50;
+            --warning: #ff9800;
+            --error: #f44336;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        h1 {
+            font-size: 24px;
+            font-weight: 400;
+            margin-bottom: 5px;
+            color: #ffffff;
+        }
+        
+        .status {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        .section {
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 15px;
+            background: var(--bg-tertiary);
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+            color: #ffffff;
+        }
+        
+        /* Pairing Controls */
+        .pairing-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+        
+        /* Chat Area */
+        #chatBox {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            padding: 12px;
+            margin-bottom: 15px;
+            background: #1e1e1e;
+            font-size: 14px;
+            line-height: 1.5;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .chat-input {
+            display: flex;
+            gap: 10px;
+        }
+        
+        /* Form elements */
+        input, select, button {
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+        
+        input, select {
+            background: #1e1e1e;
+            color: var(--text-primary);
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(74, 140, 255, 0.2);
+        }
+        
+        button {
+            background: #3a3a3a;
+            color: white;
+            cursor: pointer;
+            border: 1px solid #555;
+        }
+        
+        button:hover:not(:disabled) {
+            background: #4a4a4a;
+            border-color: #666;
+        }
+        
+        button:disabled {
+            background: #2a2a2a;
+            color: #666;
+            cursor: not-allowed;
+            border-color: #333;
+        }
+        
+        button:active:not(:disabled) {
+            background: #333;
+        }
+        
+        /* Status indicators */
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-connected { background-color: var(--success); }
+        .status-connecting { background-color: var(--warning); }
+        .status-disconnected { background-color: var(--error); }
+        
+        /* File transfer section */
+        .file-section {
+            margin-top: 15px;
+        }
+        
+        .file-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+        
+        #fileStatus {
+            padding: 12px;
+            background: #1e1e1e;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 14px;
+            margin-bottom: 15px;
+            min-height: 50px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        #download {
+            margin-top: 15px;
+        }
+        
+        #download a {
+            color: var(--accent);
+            text-decoration: none;
+            display: block;
+            padding: 8px;
+            background: rgba(74, 140, 255, 0.1);
+            border: 1px solid var(--accent);
+            border-radius: 4px;
+            margin: 5px 0;
+            transition: background-color 0.2s;
+        }
+        
+        #download a:hover {
+            background: rgba(74, 140, 255, 0.2);
+            text-decoration: none;
+        }
+        
+        /* File input styling */
+        input[type="file"] {
+            background: #2a2a2a;
+            border: 2px dashed var(--border);
+            cursor: pointer;
+            flex: 1;
+        }
+        
+        input[type="file"]:hover {
+            border-color: var(--accent);
+            background: #2d2d2d;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 15px;
+            }
+            
+            .pairing-controls, .file-controls, .chat-input {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            button {
+                width: 100%;
+            }
+            
+            #chatBox {
+                height: 250px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 20px;
+            }
+            
+            .section-title {
+                font-size: 16px;
+            }
+            
+            #chatBox {
+                height: 200px;
+            }
+            
+            input, select, button {
+                padding: 12px;
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+        }
+        
+        /* Loading animation */
+        .spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid var(--border);
+            border-top: 2px solid var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Connection status */
+        .connection-status {
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-bottom: 10px;
+            border: 1px solid;
+        }
+        
+        .connection-status.connected {
+            background: rgba(76, 175, 80, 0.1);
+            border-color: var(--success);
+            color: var(--success);
+        }
+        
+        .connection-status.connecting {
+            background: rgba(255, 152, 0, 0.1);
+            border-color: var(--warning);
+            color: var(--warning);
+        }
+        
+        .connection-status.disconnected {
+            background: rgba(244, 67, 54, 0.1);
+            border-color: var(--error);
+            color: var(--error);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>WebRTC Chat & File Transfer</h1>
+        <div class="status">Peer-to-peer file sharing with Pokémon names</div>
+    </header>
+    
+    <div class="container">
+        <!-- Connection Section -->
+        <div class="section">
+            <div class="section-title">Connection</div>
+            <div class="pairing-controls">
+                <select id="peerSelect">
+                    <option value="">Select a peer to connect</option>
+                </select>
+                <button id="pairBtn">Pair</button>
+                <button id="startBtn" disabled>Start Connection</button>
+            </div>
+            <div id="connectionStatus" class="connection-status disconnected">
+                <span class="status-indicator status-disconnected"></span>
+                Waiting to connect...
+            </div>
+        </div>
+        
+        <!-- Chat Section -->
+        <div class="section">
+            <div class="section-title">Chat</div>
+            <div id="chatBox"></div>
+            <div class="chat-input">
+                <input type="text" id="msgInput" placeholder="Type your message here..." disabled>
+                <button id="sendBtn" disabled>Send</button>
+            </div>
+        </div>
+        
+        <!-- File Transfer Section -->
+        <div class="section">
+            <div class="section-title">File Transfer</div>
+            <div class="file-section">
+                <div class="file-controls">
+                    <input type="file" id="fileInput" disabled>
+                    <button id="sendFileBtn" disabled>Send File</button>
+                </div>
+                
+                <div id="fileStatus">Ready to send or receive files</div>
+                <div id="download"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Enable/disable UI elements based on connection state
+        function updateUIState(state) {
+            const elements = {
+                msgInput: document.getElementById("msgInput"),
+                sendBtn: document.getElementById("sendBtn"),
+                fileInput: document.getElementById("fileInput"),
+                sendFileBtn: document.getElementById("sendFileBtn"),
+                connectionStatus: document.getElementById("connectionStatus")
+            };
+
+            switch(state) {
+                case 'connected':
+                    elements.msgInput.disabled = false;
+                    elements.sendBtn.disabled = false;
+                    elements.fileInput.disabled = false;
+                    elements.sendFileBtn.disabled = false;
+                    elements.connectionStatus.className = "connection-status connected";
+                    elements.connectionStatus.innerHTML = '<span class="status-indicator status-connected"></span>Connected and ready';
+                    break;
+                case 'connecting':
+                    elements.msgInput.disabled = true;
+                    elements.sendBtn.disabled = true;
+                    elements.fileInput.disabled = true;
+                    elements.sendFileBtn.disabled = true;
+                    elements.connectionStatus.className = "connection-status connecting";
+                    elements.connectionStatus.innerHTML = '<span class="spinner"></span>Connecting...';
+                    break;
+                default: // disconnected
+                    elements.msgInput.disabled = true;
+                    elements.sendBtn.disabled = true;
+                    elements.fileInput.disabled = true;
+                    elements.sendFileBtn.disabled = true;
+                    elements.connectionStatus.className = "connection-status disconnected";
+                    elements.connectionStatus.innerHTML = '<span class="status-indicator status-disconnected"></span>Not connected';
+            }
+        }
+
+        // Initialize UI state
+        updateUIState('disconnected');
+        
+        // Expose function globally so the client script can use it
+        window.updateUIState = updateUIState;
+    </script>
+</body>
+</html>
