@@ -12,3 +12,5 @@ Setup
 ```bash
 npm init -y
 npm install express socket.io
+```
+![App Screenshot](interface.png)
